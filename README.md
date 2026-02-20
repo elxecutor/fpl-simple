@@ -1,42 +1,46 @@
 
-# Project Title
+# FPL Simple Squad Selector
 
-Brief description of what the project does and its main features.
+This tiny utility consumes Fantasy Premier League's public bootstrap endpoint and picks a squad by multiplying each player's ICT Index by their total points. It then returns:
+
+- 2 Goalkeepers
+- 5 Defenders
+- 5 Midfielders
+- 3 Forwards
 
 ## Table of Contents
-- [Features](#features)
-- [Installation](#installation)
+- [Setup](#setup)
 - [Usage](#usage)
+- [Notes](#notes)
 - [File Overview](#file-overview)
 - [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
 
-## Features
-- Feature 1
-- Feature 2
-- Feature 3
-
-## Installation
-Clone the repository and install dependencies:
+## Setup
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Usage
-1. Step 1:
-   ```bash
-   # command
-   ```
-2. Step 2:
-   ```bash
-   # command
-   ```
+
+```bash
+python main.py
+```
+
+The script prints the best players at each position sorted by the ICT × total-points metric.
+
+## Notes
+
+- Data is fetched live from `https://fantasy.premierleague.com/api/bootstrap-static/`.
+- Network access is required. If the request fails, rerun once connectivity is restored.
 
 ## File Overview
+
+*Provide a brief explanation of key files if desired.*
 
 ## Contributing
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) for details.

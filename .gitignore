@@ -1,0 +1,39 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# IDE/editor files
+.vscode/
+*.swp
+
+# distribution
+build/
+dist/
+*.egg-info/
+
+# Logs and SQLite files
+*.log
+*.sqlite3
+
+# mypy
+.mypy_cache/
+
+# pipenv
+Pipfile.lock
+
+# pyenv
+.python-version
+
+# coverage
+.coverage
+htmlcov/
+
+# pytest
+.pytest_cache/
+
+# other
+*.env
+squad.json
