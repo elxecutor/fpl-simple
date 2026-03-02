@@ -90,22 +90,29 @@ class Player:
     @property
     def composite_score(self) -> float:
         """
-        Improved scoring formula:
-        - Uses xP (expected points) as anchor when available
-        - Falls back to PPG * form blend for reliability
+        Refined scoring formula that favors xP when reliable:
+        - Uses xP as primary driver when player is fit and playing regularly
+        - Falls back to PPG blend only when xP is unreliable (0 or injured)
+        - Enhanced position multiplier favoring midfielders (clean sheet + goal points)
         - ICT used as tiebreaker, not primary driver
-        - Position multiplier for attacking potential
         """
-        # Base: blend of xP and historical PPG
+        # Base: use xP as anchor when available and reliable
         xp = self.expected_points_next
         ppg = self.points_per_game
+        minutes = self.average_minutes_per_appearance
         
-        if xp > 0 and ppg > 0:
-            # Trust xP more for immediate, PPG for consistency
-            base = (xp * 0.6 + ppg * 0.4) * 10  # Scale up for visibility
-        elif xp > 0:
-            base = xp * 10
+        # Determine if xP is reliable (player is fit and playing)
+        xp_reliable = xp > 0 and minutes >= MIN_MINUTES_THRESHOLD
+        
+        if xp_reliable:
+            # Trust xP heavily when player is fit and playing
+            if ppg > 0:
+                # Light blend with PPG for stability (80/20 instead of 60/40)
+                base = (xp * 0.8 + ppg * 0.2) * 10
+            else:
+                base = xp * 10
         elif ppg > 0:
+            # No reliable xP, fall back to PPG
             base = ppg * 10
         else:
             base = 0.0
@@ -113,8 +120,9 @@ class Player:
         # ICT as secondary factor (10% weight) - rewards underlying performance
         ict_bonus = self.ict_index * 0.1
         
-        # Position multiplier - attackers score more points
-        position_mult = {"GKP": 0.85, "DEF": 1.0, "MID": 1.1, "FWD": 1.15}.get(self.position_name, 1.0)
+        # Enhanced position multiplier - midfielders favored for clean sheet + goal points
+        # MID now gets 1.15 (higher than FWD) for better scoring potential
+        position_mult = {"GKP": 0.85, "DEF": 1.0, "MID": 1.15, "FWD": 1.1}.get(self.position_name, 1.0)
         
         return (base + ict_bonus) * position_mult
 

@@ -7,8 +7,9 @@ from .models import Player, Fixture, MIN_MINUTES_THRESHOLD, MIN_APPEARANCES_THRE
 
 def calculate_fixture_difficulty_score(player: Player, next_n_gw: int = 5) -> float:
     """
-    Calculate a multiplier based on upcoming fixture difficulty.
+    Calculate a multiplier based on upcoming fixture difficulty with time-weighted decay.
     Lower difficulty -> Higher multiplier.
+    Closer fixtures are weighted more heavily (GW+1: 1.0, GW+2: 0.8, GW+3: 0.6, etc.).
     
     Base multiplier is 1.0.
     Each easy fixture (difficulty <= 2) adds bonus.
@@ -22,19 +23,22 @@ def calculate_fixture_difficulty_score(player: Player, next_n_gw: int = 5) -> fl
     if not fixtures:
         return 1.0
         
-    total_difficulty = 0
-    count = 0
+    weighted_difficulty = 0.0
+    total_weight = 0.0
     
-    for f in fixtures:
+    for idx, f in enumerate(fixtures):
         # Determine if home or away for this player
         if f.team_h == player.team_id:
             diff = f.team_h_difficulty
         else:
             diff = f.team_a_difficulty
-        total_difficulty += diff
-        count += 1
         
-    avg_diff = total_difficulty / count if count > 0 else 3.0
+        # Apply decaying weight: GW+1=1.0, GW+2=0.8, GW+3=0.6, GW+4=0.4, GW+5=0.2
+        weight = max(0.2, 1.0 - (idx * 0.2))
+        weighted_difficulty += diff * weight
+        total_weight += weight
+        
+    avg_diff = weighted_difficulty / total_weight if total_weight > 0 else 3.0
     
     # Formula (30% impact per difficulty step): 
     # Avg diff 3 -> 1.0
@@ -74,7 +78,13 @@ def calculate_form_vs_season_metric(player: Player) -> float:
     """
     Compare recent form (last 30 days avg) vs season PPG.
     Returns the difference. Positive means overperforming season avg.
+    Handles blank gameweeks intelligently - doesn't penalize players for team postponements.
     """
+    # If player had a blank gameweek (team didn't play), don't penalize artificially low form
+    if player.dgw_fixture_count == 0:
+        # During BGW, form drops artificially - rely more on season average
+        return 0.0
+    
     return player.form - player.points_per_game
 
 
@@ -206,12 +216,14 @@ def optimize_budget(
     current_squad: List[Player], 
     all_players: List[Player], 
     bank: float, 
-    max_transfers: int = 1
+    max_transfers: int = 1,
+    free_transfers: int = 1
 ) -> List[Dict]:
     """
     Suggest transfers to maximize score within budget.
     Uses full combinatorial search for optimal results.
     Includes: DGW/BGW awareness, price momentum, fixture difficulty.
+    Now includes -4 point penalty for each transfer beyond free transfers.
     """
     max_transfers = max(1, min(max_transfers, 5))
 
@@ -302,14 +314,19 @@ def optimize_budget(
             if idx == n:
                 # Complete combination found
                 in_score = sum(player_scores.get(p.id, 0) for p in chosen)
-                delta = in_score - out_score
-                if delta > best_delta:
-                    best_delta = delta
+                # Calculate net delta accounting for transfer hit penalties
+                # Every transfer beyond free_transfers costs 4 points
+                transfer_hit_penalty = max(0, n - free_transfers) * 4
+                net_delta = in_score - out_score - transfer_hit_penalty
+                if net_delta > best_delta:
+                    best_delta = net_delta
                     best_result = {
                         "type": f"{n}_transfer",
                         "out": list(out_players),
                         "in": list(chosen),
-                        "delta": delta,
+                        "delta": net_delta,
+                        "gross_delta": in_score - out_score,
+                        "transfer_hit": transfer_hit_penalty,
                         "out_score": out_score,
                         "in_score": in_score
                     }
@@ -406,8 +423,11 @@ def select_best_xi(squad: List[Player]) -> Dict:
             continue
 
         current_xi = [gkps[0]] + defs[:n_def] + mids[:n_mid] + fwds[:n_fwd]
-        # Score XI using base adjusted scores for display purposes
-        current_score = sum(player_scores[p.id] for p in current_xi)
+        # Score XI accounting for captain doubling (captaincy-aware optimization)
+        # Find best captain candidate in this XI
+        max_captain_score = max(player_scores[p.id] for p in current_xi)
+        # Total score = sum of 10 players + double the captain's score
+        current_score = sum(player_scores[p.id] for p in current_xi) + max_captain_score
 
         if current_score > best_score:
             best_score = current_score
@@ -467,10 +487,10 @@ def select_budget_dream_xi(all_players: List[Player], budget: float = 100.0) -> 
     pos_counts = defaultdict(int)
     total_cost = 0.0
     
-    # First pass: fill minimums with best value players
+    # First pass: fill minimums with best value players (with ownership tie-breaking)
     for pos in [1, 2, 3, 4]:
         pos_cands = sorted([p for p in candidates if p.element_type == pos], 
-                          key=lambda p: player_values.get(p.id, 0), 
+                          key=lambda p: (player_values.get(p.id, 0), p.selected_by_percent), 
                           reverse=True)
         for p in pos_cands:
             cost = p.now_cost / 10
@@ -484,12 +504,16 @@ def select_budget_dream_xi(all_players: List[Player], budget: float = 100.0) -> 
                 if pos_counts[pos] >= pos_min[pos]:
                     break
     
-    # Second pass: fill remaining 11 spots with best available
-    for p in sorted_candidates:
+    # Second pass: fill remaining 11 spots with best available (with ownership tie-breaking)
+    # Sort by score first, then by ownership for ties
+    sorted_candidates_with_ownership = sorted(
+        [p for p in sorted_candidates if p not in selected],
+        key=lambda p: (player_scores.get(p.id, 0), p.selected_by_percent),
+        reverse=True
+    )
+    for p in sorted_candidates_with_ownership:
         if len(selected) >= 11:
             break
-        if p in selected:
-            continue
         cost = p.now_cost / 10
         if (pos_counts[p.element_type] < pos_limits[p.element_type]
             and team_counts[p.team_id] < 3

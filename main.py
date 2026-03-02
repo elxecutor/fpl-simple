@@ -398,7 +398,8 @@ def main() -> None:
                 current_squad,
                 players,
                 bank,
-                max_transfers=max_transfer_eval
+                max_transfers=max_transfer_eval,
+                free_transfers=free_transfers
             )
             
             if not recommendations:
