@@ -131,8 +131,13 @@ class FPLClient:
             all_fixtures = self.fetch_fixtures()
             # Filter for future fixtures
             future_fixtures = [f for f in all_fixtures if not f.finished and f.event is not None]
+            
+            # Find the global next gameweek across all teams
+            next_global_event = min(f.event for f in future_fixtures) if future_fixtures else None
+            
         except FPLClientError:
             future_fixtures = []
+            next_global_event = None
             print("Warning: Could not fetch fixtures, difficulty scoring will be disabled.")
 
         players: List[Player] = []
@@ -168,7 +173,8 @@ class FPLClient:
                     expected_points_next=rp.expected_points_next,
                     selected_by_percent=rp.selected_by_percent,
                     cost_change_event=rp.cost_change_event,
-                    upcoming_fixtures=player_fixtures
+                    upcoming_fixtures=player_fixtures,
+                    next_global_event=next_global_event
                 )
             )
         return players

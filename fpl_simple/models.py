@@ -45,6 +45,7 @@ class Player:
 
     # Enriched data
     upcoming_fixtures: List[Fixture] = field(default_factory=list)
+    next_global_event: int | None = None  # Global next gameweek for accurate BGW detection
 
     @property
     def display_name(self) -> str:
@@ -78,14 +79,13 @@ class Player:
 
     @property
     def dgw_fixture_count(self) -> int:
-        """Count fixtures in next GW (2 = DGW, 0 = BGW, 1 = normal)."""
-        if not self.upcoming_fixtures:
+        """Count fixtures in next GW (2 = DGW, 0 = BGW, 1 = normal).
+        Compares against the global next event to accurately detect blanks.
+        """
+        # Compare against the global next event to catch teams that skip a gameweek
+        if not self.upcoming_fixtures or not self.next_global_event:
             return 0
-        # Check fixtures in the first event
-        first_event = self.upcoming_fixtures[0].event if self.upcoming_fixtures else None
-        if first_event is None:
-            return 0
-        return sum(1 for f in self.upcoming_fixtures if f.event == first_event)
+        return sum(1 for f in self.upcoming_fixtures if f.event == self.next_global_event)
 
     @property
     def composite_score(self) -> float:
