@@ -392,9 +392,12 @@ def main() -> None:
 
         if args.optimize:
             print("\n--- Budget Optimizer ---")
-            print(f"Optimizing for squad of {len(current_squad)} players with {bank}m bank...")
-            # Evaluate up to 1 transfer beyond your free transfers to check if a -4 hit is worth it
+            
+            # Always evaluate one transfer beyond FTs to see if a hit is mathematically necessary
             max_transfer_eval = min(5, free_transfers + 1)
+            print(f"Optimizing for squad of {len(current_squad)} players with {bank}m bank...")
+            print(f"Available FTs: {free_transfers}. Evaluating up to {max_transfer_eval} transfers.")
+
             recommendations = optimize_budget(
                 current_squad,
                 players,
@@ -405,25 +408,40 @@ def main() -> None:
             
             if not recommendations:
                 print("No better transfers found within budget.")
-                print("\n💡 Recommendation: ROLL your free transfer to next week.")
                 return
+
+            # Separate free transfers and hit transfers
+            free_recs = [r for r in recommendations if r.get('transfer_hit', 0) == 0]
+            best_free_delta = free_recs[0]['delta'] if free_recs else 0
             
-            # The recommendations are already sorted by the penalty-adjusted net delta.
-            # We don't need to filter by FT anymore because the hit is accounted for!
+            # A hit is only "necessary" if it pays back the -4 AND beats the best free 
+            # option by a safety margin of ~2 expected FPL points (20 AdjScore points)
+            RISK_BUFFER = 20.0 
+            
+            final_recs = []
+            for rec in recommendations:
+                if rec.get('transfer_hit', 0) > 0:
+                    # Only keep the hit if it crushes the free transfer option
+                    if rec['delta'] > (best_free_delta + RISK_BUFFER):
+                        final_recs.append(rec)
+                else:
+                    final_recs.append(rec)
+            
+            if not final_recs:
+                print("No mathematically viable transfers found.")
+                return
+
             transfer_names = {1: "Single", 2: "Double", 3: "Triple", 4: "Quadruple", 5: "Quintuple"}
             
-            best_delta = recommendations[0]['delta'] if recommendations else 0
-            
-            # Threshold: if delta < 50, it means we gain less than ~5 expected FPL points. 
-            # Might be better to save the FT for flexibility.
+            best_delta = final_recs[0]['delta']
             ROLL_THRESHOLD = 50
             should_roll = best_delta < ROLL_THRESHOLD and free_transfers < 2
             
-            print(f"\n=== Top 3 Optimized Transfers (Net Delta accounts for -4 hits) ===")
-            for i, rec in enumerate(recommendations[:3]):
+            print(f"\n=== Top 3 Optimized Transfers ===")
+            for i, rec in enumerate(final_recs[:3]):
                 ft_cost = len(rec['out'])
                 hit_taken = rec.get('transfer_hit', 0)
-                hit_str = f" (-{int(hit_taken/10)} pt hit)" if hit_taken > 0 else " (Free)"
+                hit_str = f" [⚠️ -{int(hit_taken/10)} pt hit justified!]" if hit_taken > 0 else " (Free)"
                 
                 print(f"{i+1}. {transfer_names.get(ft_cost, str(ft_cost)+'-player')} Transfer | Net Delta: {rec['delta']:.1f}{hit_str}")
                 print("   OUT:")
@@ -436,7 +454,7 @@ def main() -> None:
             # Roll FT suggestion
             if should_roll:
                 print(f"\n💡 Consider ROLLING your FT (best net delta = {best_delta:.1f} < {ROLL_THRESHOLD}).")
-                print("   Low immediate improvement suggests saving the FT for a better opportunity next week.")
+                print("   Low immediate improvement suggests saving the FT for next week.")
         return
 
     # Default behavior: Select best squad
