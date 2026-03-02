@@ -393,7 +393,8 @@ def main() -> None:
         if args.optimize:
             print("\n--- Budget Optimizer ---")
             print(f"Optimizing for squad of {len(current_squad)} players with {bank}m bank...")
-            max_transfer_eval = max(1, min(free_transfers, 5))
+            # Evaluate up to 1 transfer beyond your free transfers to check if a -4 hit is worth it
+            max_transfer_eval = min(5, free_transfers + 1)
             recommendations = optimize_budget(
                 current_squad,
                 players,
