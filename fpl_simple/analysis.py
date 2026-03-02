@@ -315,8 +315,10 @@ def optimize_budget(
                 # Complete combination found
                 in_score = sum(player_scores.get(p.id, 0) for p in chosen)
                 # Calculate net delta accounting for transfer hit penalties
-                # Every transfer beyond free_transfers costs 4 points
-                transfer_hit_penalty = max(0, n - free_transfers) * 4
+                # Every transfer beyond free_transfers costs 4 FPL points.
+                # Since AdjScore scales xP by 10, a 4-point hit is roughly 40 AdjScore points.
+                HIT_COST = 40
+                transfer_hit_penalty = max(0, n - free_transfers) * HIT_COST
                 net_delta = in_score - out_score - transfer_hit_penalty
                 if net_delta > best_delta:
                     best_delta = net_delta

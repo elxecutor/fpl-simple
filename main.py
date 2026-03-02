@@ -407,52 +407,35 @@ def main() -> None:
                 print("\n💡 Recommendation: ROLL your free transfer to next week.")
                 return
             
-            # Group by transfer count
+            # The recommendations are already sorted by the penalty-adjusted net delta.
+            # We don't need to filter by FT anymore because the hit is accounted for!
             transfer_names = {1: "Single", 2: "Double", 3: "Triple", 4: "Quadruple", 5: "Quintuple"}
             
-            # Filter to transfers matching FT count
-            matching_transfers = [r for r in recommendations if len(r['out']) == free_transfers]
-            
-            # Calculate roll FT suggestion
-            # If best delta is low, suggest rolling FT
             best_delta = recommendations[0]['delta'] if recommendations else 0
-            best_single_delta = max((r['delta'] for r in recommendations if len(r['out']) == 1), default=0)
             
-            # Threshold: if delta per transfer < 50, suggest rolling
+            # Threshold: if delta < 50, it means we gain less than ~5 expected FPL points. 
+            # Might be better to save the FT for flexibility.
             ROLL_THRESHOLD = 50
-            delta_per_ft = best_delta / len(recommendations[0]['out']) if recommendations else 0
-            should_roll = delta_per_ft < ROLL_THRESHOLD and free_transfers < 2
+            should_roll = best_delta < ROLL_THRESHOLD and free_transfers < 2
             
-            if matching_transfers:
-                print(f"\n=== Top 3 {transfer_names.get(free_transfers, str(free_transfers)+'-player')} Transfers (using all {free_transfers} FT) ===")
-                for i, rec in enumerate(matching_transfers[:3]):
-                    ft_cost = len(rec['out'])
-                    print(f"{i+1}. {transfer_names.get(ft_cost, str(ft_cost)+'-player')} Transfer (Delta: {rec['delta']:.1f}):")
-                    print("   OUT:")
-                    for p_out in rec['out']:
-                        print(f"     - {p_out.web_name} (Selling at {p_out.selling_cost_str}) - AdjScore {get_display_score(p_out):.1f}")
-                    print("   IN:")
-                    for p_in in rec['in']:
-                        print(f"     - {p_in.web_name} (Buying at {p_in.cost_str}) - AdjScore {get_display_score(p_in):.1f}")
-            else:
-                # Fallback: show best available if no matching FT count
-                print(f"\nNo {free_transfers}-transfer options found. Best available:")
-                for i, rec in enumerate(recommendations[:3]):
-                    ft_cost = len(rec['out'])
-                    print(f"{i+1}. {transfer_names.get(ft_cost, str(ft_cost)+'-player')} Transfer (Delta: {rec['delta']:.1f}, FT cost: {ft_cost}):")
-                    print("   OUT:")
-                    for p_out in rec['out']:
-                        print(f"     - {p_out.web_name} (Selling at {p_out.selling_cost_str}) - AdjScore {get_display_score(p_out):.1f}")
-                    print("   IN:")
-                    for p_in in rec['in']:
-                        print(f"     - {p_in.web_name} (Buying at {p_in.cost_str}) - AdjScore {get_display_score(p_in):.1f}")
+            print(f"\n=== Top 3 Optimized Transfers (Net Delta accounts for -4 hits) ===")
+            for i, rec in enumerate(recommendations[:3]):
+                ft_cost = len(rec['out'])
+                hit_taken = rec.get('transfer_hit', 0)
+                hit_str = f" (-{int(hit_taken/10)} pt hit)" if hit_taken > 0 else " (Free)"
+                
+                print(f"{i+1}. {transfer_names.get(ft_cost, str(ft_cost)+'-player')} Transfer | Net Delta: {rec['delta']:.1f}{hit_str}")
+                print("   OUT:")
+                for p_out in rec['out']:
+                    print(f"     - {p_out.web_name} (Selling at {p_out.selling_cost_str}) - AdjScore {get_display_score(p_out):.1f}")
+                print("   IN:")
+                for p_in in rec['in']:
+                    print(f"     - {p_in.web_name} (Buying at {p_in.cost_str}) - AdjScore {get_display_score(p_in):.1f}")
             
             # Roll FT suggestion
             if should_roll:
-                print(f"\n💡 Consider ROLLING your FT (delta/transfer = {delta_per_ft:.1f} < {ROLL_THRESHOLD}).")
-                print("   Low improvement suggests saving FT for a better opportunity.")
-            elif free_transfers == 1 and best_single_delta < ROLL_THRESHOLD:
-                print(f"\n💡 Consider ROLLING your FT to have 2 next week (best single delta = {best_single_delta:.1f}).")
+                print(f"\n💡 Consider ROLLING your FT (best net delta = {best_delta:.1f} < {ROLL_THRESHOLD}).")
+                print("   Low immediate improvement suggests saving the FT for a better opportunity next week.")
         return
 
     # Default behavior: Select best squad
