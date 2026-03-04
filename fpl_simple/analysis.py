@@ -89,16 +89,18 @@ def calculate_form_vs_season_metric(player: Player) -> float:
 
 
 def calculate_form_multiplier(player: Player) -> float:
-    """Aggressively ride the wave of players hitting form spikes."""
+    """
+    Subtle form modifier so we don't double-dip with the base score.
+    Capped tightly so temporary spikes don't overtake elite pedigree.
+    """
     diff = calculate_form_vs_season_metric(player)
     
     if diff > 0:
-        # Massive boost for players suddenly hauling above their season average
-        # No artificial cap. If they are on fire, we want them.
-        return 1.0 + (diff * 0.35)
+        # Very gentle boost, strictly capped at 1.15x
+        return min(1.15, 1.0 + (diff * 0.02))
         
-    # Gentle penalty for dips—class is permanent, form is temporary
-    return max(0.85, 1.0 + diff * 0.05)
+    # Gentle penalty for dips
+    return max(0.90, 1.0 + (diff * 0.02))
 
 
 def calculate_dgw_multiplier(player: Player) -> float:
@@ -243,22 +245,24 @@ def optimize_budget(
         """Score for player being transferred IN."""
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        dgw_mult = calculate_dgw_multiplier(p)
         price_mult = calculate_price_momentum_bonus(p, for_transfer_in=True)
-        # Double fixture difficulty for transfer decisions
-        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 2.0)
-        # xP bonus for high expected points
-        xp_bonus = max(0, p.expected_points_next - 4) * 5
-        return fix_boost * dgw_mult * price_mult + xp_bonus
+        
+        # Match the global display score EXACTLY (1.2 fixture multiplier)
+        clean_score = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
+        
+        # Only add the price momentum bonus (buy risers)
+        return clean_score * price_mult
     
     def get_transfer_score_out(p: Player) -> float:
         """Score for player being transferred OUT (includes sell momentum)."""
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        dgw_mult = calculate_dgw_multiplier(p)
         price_mult = calculate_price_momentum_bonus(p, for_transfer_in=False)
-        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 2.0)
-        return fix_boost * dgw_mult * price_mult
+        
+        # Match the global display score EXACTLY
+        clean_score = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
+        
+        return clean_score * price_mult
     
     player_scores = {p.id: get_transfer_score_in(p) for p in candidates}
     current_scores = {p.id: get_transfer_score_out(p) for p in current_squad}

@@ -90,23 +90,26 @@ class Player:
     @property
     def composite_score(self) -> float:
         """
-        Pure Double-Digit Ceiling Formula:
-        Explicitly targets players with explosive underlying stats and punishes blankers.
+        Elite Hauler Formula:
+        Targets proven premium players who consistently deliver double digits (High PPG), 
+        ignoring mid-priced one-week wonders.
         """
-        # 1. Per-game Threat and Creativity
+        # 1. True Pedigree: Elite players have high season-long PPG
+        ppg_base = self.points_per_game * 10.0
+        
+        # 2. Per-game Threat (Underlying stats per appearance)
         ict_per_game = self.ict_index / max(1.0, self.appearances)
         
-        # 2. Exponential Form Multiplier: 
-        # If a player is blanking (form < 2), they get crushed. 
-        # If they are hauling (form > 6), their score skyrockets.
-        form_factor = max(0, self.form) ** 1.5 
+        # 3. Expected Points for the next fixture
+        xp_base = self.expected_points_next * 5.0
         
-        # 3. Base calculation favoring xP and Explosiveness over season-long safety
-        base = (ict_per_game * 5.0) + (form_factor * 3.0) + (self.expected_points_next * 4.0)
+        # 4. A flat, safe form boost. No exponents so we don't get baited by trap players.
+        form_base = self.form * 2.0
         
-        # 4. Positional Bias for Hauls
-        # Goalscoring midfielders and forwards are where double digits live. 
-        # Goalkeepers and steady defenders are nerfed so they don't clog the recommendations.
+        # Base calculation heavily favors established class (PPG) and xP
+        base = ppg_base + (ict_per_game * 3.0) + xp_base + form_base
+        
+        # 5. Positional Bias for Hauls
         position_mult = {"GKP": 0.5, "DEF": 0.9, "MID": 1.5, "FWD": 1.4}.get(self.position_name, 1.0)
         
         return base * position_mult
