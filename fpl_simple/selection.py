@@ -42,13 +42,13 @@ def select_best_squad(
             
         players_by_position.setdefault(player.element_type, []).append(player)
 
-    # Score with doubled fixture difficulty weighting and fixture count consideration
+    # Score with reduced fixture difficulty weighting - prioritize explosive players
     def get_squad_score(p: Player) -> float:
         from .analysis import calculate_fixture_difficulty_score, calculate_fixture_count_multiplier
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        # Triple fixture difficulty impact for better prioritization
-        return adj_score * (1.0 + (fix_mult - 1.0) * 3.0)
+        # Reduced fixture impact so elite players aren't dropped for easy fixtures
+        return adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
 
     selection: dict[str, List[Player]] = {}
     for requirement in requirements:

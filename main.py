@@ -30,7 +30,7 @@ def normalize_name(name: str) -> str:
 def get_display_score(p):
     base = calculate_adjusted_score(p)
     fix = calculate_fixture_difficulty_score(p)
-    return base * (1.0 + (fix - 1.0) * 3.0)
+    return base * (1.0 + (fix - 1.0) * 1.2)
 
 def format_row(player) -> str:
     fix_score = calculate_fixture_difficulty_score(player)

@@ -90,41 +90,26 @@ class Player:
     @property
     def composite_score(self) -> float:
         """
-        Refined scoring formula that favors xP when reliable:
-        - Uses xP as primary driver when player is fit and playing regularly
-        - Falls back to PPG blend only when xP is unreliable (0 or injured)
-        - Enhanced position multiplier favoring midfielders (clean sheet + goal points)
-        - ICT used as tiebreaker, not primary driver
+        Aggressive scoring formula for high-ceiling players:
+        - Heavily weights ICT Index (underlying threat and creativity)
+        - Rewards immediate form spikes
+        - Boosts attacking defenders and goal-scoring midfielders
         """
-        # Base: use xP as anchor when available and reliable
-        xp = self.expected_points_next
-        ppg = self.points_per_game
-        minutes = self.average_minutes_per_appearance
+        # 1. ICT is the best predictor of double-digit hauls (shots, key passes, crosses)
+        ict_base = self.ict_index * 1.5
         
-        # Determine if xP is reliable (player is fit and playing)
-        xp_reliable = xp > 0 and minutes >= MIN_MINUTES_THRESHOLD
+        # 2. PPG acts as a baseline, but we amplify recent form to catch hot streaks
+        form_base = self.form * 2.5
+        ppg_base = self.points_per_game * 1.5
         
-        if xp_reliable:
-            # Trust xP heavily when player is fit and playing
-            if ppg > 0:
-                # Light blend with PPG for stability (80/20 instead of 60/40)
-                base = (xp * 0.8 + ppg * 0.2) * 10
-            else:
-                base = xp * 10
-        elif ppg > 0:
-            # No reliable xP, fall back to PPG
-            base = ppg * 10
-        else:
-            base = 0.0
+        base = ict_base + form_base + ppg_base
         
-        # ICT as secondary factor (10% weight) - rewards underlying performance
-        ict_bonus = self.ict_index * 0.1
+        # 3. Aggressive Position Multipliers
+        # Defenders who get attacking returns are gold (6 pts per goal + 4 CS) - stop capping them!
+        # Mids get 5 pts per goal + 1 CS.
+        position_mult = {"GKP": 0.8, "DEF": 1.25, "MID": 1.35, "FWD": 1.2}.get(self.position_name, 1.0)
         
-        # Enhanced position multiplier - midfielders favored for clean sheet + goal points
-        # MID now gets 1.15 (higher than FWD) for better scoring potential
-        position_mult = {"GKP": 0.85, "DEF": 1.0, "MID": 1.15, "FWD": 1.1}.get(self.position_name, 1.0)
-        
-        return (base + ict_bonus) * position_mult
+        return base * position_mult
 
     @property
     def cost_str(self) -> str:

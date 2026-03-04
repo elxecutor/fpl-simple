@@ -89,15 +89,16 @@ def calculate_form_vs_season_metric(player: Player) -> float:
 
 
 def calculate_form_multiplier(player: Player) -> float:
-    """Convert form delta into a lighter multiplier to avoid chasing recent spikes.
-    Recent form (last 5 games) can be misleading; season consistency is more reliable.
-    """
+    """Aggressively ride the wave of players hitting form spikes."""
     diff = calculate_form_vs_season_metric(player)
-    if diff >= 0:
-        multiplier = 1.0 + diff * 0.06  # Lighter boost for good form
-        return min(1.4, multiplier)
-    multiplier = 1.0 + diff * 0.03  # Lighter penalty for dips
-    return max(0.85, multiplier)
+    
+    if diff > 0:
+        # Massive boost for players suddenly hauling above their season average
+        # No artificial cap. If they are on fire, we want them.
+        return 1.0 + (diff * 0.35)
+        
+    # Gentle penalty for dips—class is permanent, form is temporary
+    return max(0.85, 1.0 + diff * 0.05)
 
 
 def calculate_dgw_multiplier(player: Player) -> float:
@@ -384,13 +385,13 @@ def select_best_xi(squad: List[Player]) -> Dict:
     Select the best starting XI based on AdjScore.
     Returns a dict with 'xi', 'subs', 'formation', 'score'.
     """
-    # Calculate adjusted scores with tripled fixture difficulty weighting
+    # Calculate adjusted scores with reduced fixture impact - pedigree over fixtures
     player_scores = {}
     for p in squad:
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        # Triple fixture difficulty impact, consistent with selection and optimization
-        player_scores[p.id] = adj_score * (1.0 + (fix_mult - 1.0) * 3.0)
+        # Reduced fixture weighting so elite players aren't benched for easy fixtures
+        player_scores[p.id] = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
 
     # Separate by position
     gkps = [p for p in squad if p.element_type == 1]
@@ -475,7 +476,7 @@ def select_budget_dream_xi(all_players: List[Player], budget: float = 100.0) -> 
     for p in candidates:
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 3.0)
+        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
         xp_bonus = max(0, p.expected_points_next - 4) * 5
         player_scores[p.id] = fix_boost + xp_bonus
         player_values[p.id] = player_scores[p.id] / (p.now_cost / 10) if p.now_cost > 0 else 0
@@ -550,7 +551,7 @@ def find_differentials(all_players: List[Player], max_ownership: float = 10.0, t
     for p in candidates:
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 3.0)
+        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
         xp_bonus = max(0, p.expected_points_next - 4) * 5
         score = fix_boost + xp_bonus
         # Differential bonus: lower ownership = higher bonus
@@ -573,7 +574,7 @@ def compare_players(player1: Player, player2: Player) -> Dict:
     def get_metrics(p):
         adj_score = calculate_adjusted_score(p)
         fix_mult = calculate_fixture_difficulty_score(p)
-        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 3.0)
+        fix_boost = adj_score * (1.0 + (fix_mult - 1.0) * 1.2)
         return {
             "adj_score": fix_boost,
             "ict": p.ict_index,
