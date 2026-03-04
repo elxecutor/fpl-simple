@@ -90,24 +90,24 @@ class Player:
     @property
     def composite_score(self) -> float:
         """
-        Aggressive scoring formula for high-ceiling players:
-        - Heavily weights ICT Index (underlying threat and creativity)
-        - Rewards immediate form spikes
-        - Boosts attacking defenders and goal-scoring midfielders
+        Pure Double-Digit Ceiling Formula:
+        Explicitly targets players with explosive underlying stats and punishes blankers.
         """
-        # 1. ICT is the best predictor of double-digit hauls (shots, key passes, crosses)
-        ict_base = self.ict_index * 1.5
+        # 1. Per-game Threat and Creativity
+        ict_per_game = self.ict_index / max(1.0, self.appearances)
         
-        # 2. PPG acts as a baseline, but we amplify recent form to catch hot streaks
-        form_base = self.form * 2.5
-        ppg_base = self.points_per_game * 1.5
+        # 2. Exponential Form Multiplier: 
+        # If a player is blanking (form < 2), they get crushed. 
+        # If they are hauling (form > 6), their score skyrockets.
+        form_factor = max(0, self.form) ** 1.5 
         
-        base = ict_base + form_base + ppg_base
+        # 3. Base calculation favoring xP and Explosiveness over season-long safety
+        base = (ict_per_game * 5.0) + (form_factor * 3.0) + (self.expected_points_next * 4.0)
         
-        # 3. Aggressive Position Multipliers
-        # Defenders who get attacking returns are gold (6 pts per goal + 4 CS) - stop capping them!
-        # Mids get 5 pts per goal + 1 CS.
-        position_mult = {"GKP": 0.8, "DEF": 1.25, "MID": 1.35, "FWD": 1.2}.get(self.position_name, 1.0)
+        # 4. Positional Bias for Hauls
+        # Goalscoring midfielders and forwards are where double digits live. 
+        # Goalkeepers and steady defenders are nerfed so they don't clog the recommendations.
+        position_mult = {"GKP": 0.5, "DEF": 0.9, "MID": 1.5, "FWD": 1.4}.get(self.position_name, 1.0)
         
         return base * position_mult
 

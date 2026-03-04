@@ -393,8 +393,8 @@ def main() -> None:
         if args.optimize:
             print("\n--- Budget Optimizer ---")
             
-            # Always evaluate one transfer beyond FTs to see if a hit is mathematically necessary
-            max_transfer_eval = min(5, free_transfers + 1)
+            # Strictly limit evaluation to Free Transfers ONLY. Never take a hit.
+            max_transfer_eval = free_transfers
             print(f"Optimizing for squad of {len(current_squad)} players with {bank}m bank...")
             print(f"Available FTs: {free_transfers}. Evaluating up to {max_transfer_eval} transfers.")
 
@@ -415,8 +415,8 @@ def main() -> None:
             best_free_delta = free_recs[0]['delta'] if free_recs else 0
             
             # A hit is only "necessary" if it pays back the -4 AND beats the best free 
-            # option by a safety margin of ~2 expected FPL points (20 AdjScore points)
-            RISK_BUFFER = 20.0 
+            # option by a safety margin. Increased to demand a higher ceiling for hits.
+            RISK_BUFFER = 30.0
             
             final_recs = []
             for rec in recommendations:
